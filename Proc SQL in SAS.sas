@@ -1,3 +1,4 @@
+/* CHILOMBO CONSULTING- WRANGLING CENSUS DATA
 /* 1. Standardize ACS tables and add INDICATOR column */
 proc sql;
     create table work.agesex_clean as
