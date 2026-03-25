@@ -1,0 +1,304 @@
+---
+title: "UCONN Clean Dataset and DEI Summary Tables"
+author: "Chilombo Consulting, Vanessa"
+date: "5/21/2023"
+output: word_document
+---
+
+**_CLearing the environment_**
+```{r include=FALSE}
+
+rm(list = ls())
+```
+
+
+**_Setting working directory)**
+```{r}
+setwd("~/Documents/R/Chilombo Consulting/UCONN")
+```
+
+**Installing packages Loading libraries_**
+```{r}
+
+#packages already installed, if running for the first time add below
+remotes::install_github("ddsjoberg/gtsummary")
+install.packages("writexl")
+#run libraries
+require(readxl)
+library(devtools)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+library(stringr)
+library(padr)
+library(gtsummary)
+library(dtplyr)
+library(writexl)
+
+
+
+
+```
+
+**_Determining the size of the dataset before opening it_**
+```{r}
+file.info('DEIData.xlsx')$size
+#about 1 MB; not a big data venture by any means
+```
+
+**_Reading data_**
+```{r}
+
+DEIData_raw = read_xlsx("~/Documents/R/Chilombo Consulting/UCONN/DEIData.xlsx")
+```
+
+
+**Dropping rows for exclusion**
+```{r}
+ DEIData_master<-DEIData_raw %>% 
+ #preview/test survey
+   filter(DistributionChannel!="preview") %>% 
+ #description column
+   filter(DistributionChannel!="Distribution Channel") %>% 
+ #pre-pharmacy students
+  filter(is.na(Q1.5) |Q1.5 !="Yes, I am an undergraduate student who has NOT started my 1st year in the PharmD and/or a graduate program.") %>% 
+  #filter out missing responses to Q2 onwards
+  filter(!is.na(Q2))
+```
+
+
+
+**_Variable cleaning for each question that needs re categorization**
+```{r}
+DEIData_master_2<-DEIData_master %>% 
+#create Q17 Race/Ethnicity groupings (URM/non-URM/White/Prfer not to Say) from Q17 
+  mutate(`Q17_Race_Ethnicity` =  ifelse(Q17 =="White"  , "White",
+                                 ifelse(Q17 == "Mixed Race/Biracial"  | Q17== "Black or African American" | 
+                                        Q17== "Hispanic and/or Latino/a/e/x"|
+                                        Q17=="Hispanic and/or Latino/a/e/x,White" |
+                                        Q17=='Black or African American,East Asian/East Asian American',"URM",
+                                ifelse(Q17 == "Prefer Not to Say",
+                                      "Prefer Not to Say",
+                                  ifelse( Q17 == "East Asian/East Asian American"  | Q17== "Middle Eastern/Northern African/West Asian" |
+                                         Q17== "Middle Eastern/Northern African/West Asian,White"|
+                                           Q17=="East Asian/East Asian   American,Other" | Q17=="South Asian/South Asian American"
+                                         | Q17=="South Asian/South Asian American,White" |Q17== "East Asian/East Asian American,Other" |
+                                           Q17=="East Asian/East Asian American,South Asian/South Asian American" | Q17=="Middle Eastern/Northern African/West Asian,White,Mixed Race/Biracial"
+                                         , "Non-URM", NA
+))))) %>% 
+
+
+#create Other identity groupings from Q18)
+    dplyr::mutate(Q18_FGCS=ifelse(grepl("First Generation College Student",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_FGI=ifelse(grepl("First Generation Immigrant",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_None=ifelse(grepl("None of the Above",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_LGBTQIA2S=ifelse(grepl("LGBTQIA2S+",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_Disabilities=ifelse(grepl("Individual with Disabilities \\(Mental or Physical\\)",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_TransferStudent=ifelse(grepl("Transfer Student",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_DeafHOH=ifelse(grepl("Deaf or Hard of Hearing",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_Other=ifelse(grepl("Other",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_PreferNottoSay=ifelse(grepl("Prefer Not to Say",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_SGI=ifelse(grepl("Second Generation Immigrant",Q18, ignore.case = T), "Yes","No")) %>% 
+    dplyr::mutate(Q18_IS=ifelse(grepl("International Student",Q18, ignore.case = T), "Yes","No"))
+
+
+     ## Check cleaning of race/ethnicity & other categories in console
+      raceethnicituidentity_DQcheckDEIData_master_2 %>% count(Q17,Q17_Race_Ethnicity)
+      otheridentity_DQcheck<-DEIData_master_2 %>% count(Q18,Q18_FGCS,Q18_FGI, Q18_None, Q18_LGBTQIA2S, Q18_Disabilities,Q18_TransferStudent,Q18_DeafHOH,Q18_Other,  Q18_PreferNottoSay,Q18_SGI, Q18_IS)
+
+
+```
+
+**_Variable renaming for questions of interest_**
+```{r}
+ DEIData_master_clean<-DEIData_master_2 %>% 
+  # all unique response questions we need to use in the bivariate analysis
+   dplyr::rename("Q1_Participant Type" = `Q1`,
+                  "Q2_UCONN Addresses Issues Well" = `Q2`,
+                 "Q4_SOP Addresses Issues Well" = `Q4`,
+                 "Q8_Experienced_Stereotyping"= `Q8_1`,
+               "Q8_Experienced_Microassaults"= `Q8_2`,
+                "Q8_Experienced_Microinsults"=`Q8_3`,
+                "Q8_Experienced_Microinvalidations"=`Q8_4`,
+               "Q8_Experienced_Code-Switching"= `Q8_5`,
+               "Q8_Experienced_Power Imbalance"=`Q8_6`,
+                "Q8_Experienced_Other"=`Q8_7`,
+                "Q7_Witnessed__Stereotyping"= `Q7_1`,
+               "Q7_Witnessed_Microassaults"= `Q7_2`,
+                "Q7_Witnessed__Microinsults"=`Q7_3`,
+                "Q7_Witnessed_Microinvalidations"=`Q7_4`,
+               "Q7_Witnessed_Code-Switching"= `Q7_5`,
+               "Q7_Witnessed_Power Imbalance"=`Q7_6`,
+                "Q7_Witnessed_Other"=`Q7_7`,
+                "Q10_Material_Disrespectful"=`Q10 - Students`,
+                "Q10_Material_Disrespectful_FS"=`Q10 - Faculty/Staff`,
+                 "Q11_QA_Disrespectful"=`Q11 - Students`,
+               "Q11_QA_Disrespectful_FS"= `Q11 - Faculty/Staff`,
+               "Q14_Free_Expression"= `Q14`,
+               "Q15_Heard_Expression"= `Q15`,
+                 "Q16_Gender Identity"= `Q16`,
+                "Q19_Identities_Represented_StudentBody"= `Q19`,
+                "Q21_Identities_Represented_FacStaff"= `Q21`,
+               "Q23_Representation_Important"= `Q23`,
+               "Q24_Identities_Valued"= `Q24`,
+               "Q25_Excel_Regardless_Identity"=`Q25`) %>% 
+  #drop variables where no summary analysis is needed
+    dplyr::select( -c('StartDate':'UserLanguage', 'Q1.5', 'Q3', 'Q5', 'Q6_8_TEXT','Q7_7_TEXT', 'Q8_7_TEXT', 'Q8_7_TEXT',
+                      'Q9_10_TEXT', 'Q12_7_TEXT','Q13_28_TEXT','Q20', 'Q22', 'Q26_9_TEXT', 'Q28':'Q31')) %>% 
+
+  #drop variables where select all that apply
+    dplyr::select( -c('Q6','Q9', 'Q12', 'Q13', 'Q26')) %>% 
+
+  #drop variables that were recategorized to other variable names for race/ethnicity and other identities
+    dplyr::select(-c('Q17':'Q17_6_TEXT', 'Q18', 'Q18_6_TEXT')) 
+
+
+```
+
+**_Master Univariate Table_**
+```{r}
+ Univariate<-DEIData_master_clean 
+
+ Univariate%>%
+  tbl_summary(digits = ~ 0,
+   missing_text = "(Missing)",
+     sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Univariate Table**") %>%  
+  modify_caption("**Univariate Table*") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  #modify_footnote(all_stat_cols() ~ "missing values for Participant Type dropped; n (%)") %>% 
+  bold_labels() %>% 
+    as_gt() 
+```
+
+**_Master Participant_Type Table_**
+```{r}
+ Participant_Type<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q18_FGCS':'Q18_IS')) #remove all other identity groups from analysis
+
+Participant_Type%>%
+tbl_summary(by = `Q1_Participant Type`, digits = ~ 0,
+   missing_text = "(Missing)", sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Participant Type**") %>%  
+  modify_caption("**Table 1. Participant Type**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  #modify_footnote(all_stat_cols() ~ "missing values for Participant Type dropped; n (%)") %>% 
+  bold_labels() %>% 
+    as_gt() 
+```
+**_Master Gender Table_**
+```{r}
+ Gender_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q18_FGCS':'Q18_IS')) #remove all other identity groups from analysis
+
+ Gender_Identity%>%
+  tbl_summary(by = `Q16_Gender Identity`, digits = ~ 0,
+   missing_text = "(Missing)", sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Gender Identity**") %>%  
+  modify_caption("**Table 2. Gender Identity**") %>%
+     modify_footnote(everything() ~ NA) %>% #removes superscript from header
+ # modify_footnote(all_stat_cols() ~ "missing values for Gender Identity dropped; n (%)") %>% 
+  bold_labels() %>% 
+    as_gt() 
+```
+
+**_Master Race and Ethnicity Table_**
+```{r}
+ Race_Ethnicity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q18_FGCS':'Q18_IS')) #remove all other identity groups from analysis
+ Race_Ethnicity%>%
+  tbl_summary(by = `Q17_Race_Ethnicity`, digits = ~ 0,
+   missing_text = "(Missing)", sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Race and Ethnicity Groups**") %>%  
+  modify_caption("**Table 3. Race and Ethnicity Groups**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+ # modify_footnote(all_stat_cols() ~ "missing values for Race/Ethnicity Group dropped; n (%)") %>% 
+  bold_labels() %>% 
+    as_gt() 
+```
+
+
+
+**_Master Other Identity Tables for top 6 tables_**
+```{r}
+  FGCS_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q18_FGI':'Q18_IS')) #remove other other identity groups from analysis
+
+ FGCS_Identity%>%
+  tbl_summary(by = `Q18_FGCS`, digits = ~ 0,
+   missing_text = "(Missing)", sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**First Generation College Student Identity**") %>%  
+  modify_caption("**Table 4. *First Generation College Student Identity**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  bold_labels() %>% 
+    as_gt() 
+ 
+  FGI_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q18_FGCS', 'Q18_None':'Q18_IS')) #remove other other identity groups from analysis
+
+ FGI_Identity%>%
+  tbl_summary(by = `Q18_FGI`, digits = ~ 0,
+   missing_text = "(Missing)",sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**First Generation Immigrant Identity**") %>%  
+  modify_caption("**Table 5. *First Generation Immigrant Identity**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  bold_labels() %>% 
+    as_gt() 
+ 
+  
+  LGBTQIA2S_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q1_Participant Type','Q18_FGCS':'Q18_None','Q18_Disabilities':'Q18_IS')) #remove other other identity groups from analysis
+
+LGBTQIA2S_Identity%>%
+  tbl_summary(by = `Q18_LGBTQIA2S`, digits = ~ 0,
+   missing_text = "(Missing)", sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**LGBTQIA2S+ Identity**") %>%  
+  modify_caption("**Table 6. *LGBTQIA2S+ Identity**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  bold_labels() %>% 
+    as_gt() 
+
+
+  Disabilities_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q1_Participant Type','Q18_FGCS':'Q18_LGBTQIA2S','Q18_TransferStudent':'Q18_IS')) #remove other other identity groups from analysis
+
+  Disabilities_Identity%>%
+  tbl_summary(by = `Q18_Disabilities`, digits = ~ 0,
+   missing_text = "(Missing)",sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Disabilities-mental or physical Identity**") %>%  
+  modify_caption("**Table 7. Disabilities-mental or physical Identity**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  bold_labels() %>% 
+    as_gt() 
+  
+ Transfer_Student_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q1_Participant Type','Q18_FGCS':'Q18_Disabilities','Q18_DeafHOH':'Q18_IS')) #remove other other identity groups from analysis
+
+ Transfer_Student_Identity%>%
+  tbl_summary(by = `Q18_TransferStudent`, digits = ~ 0,
+   missing_text = "(Missing)",sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Transfer Student Identity**") %>%  
+  modify_caption("**Table 8. Transfer Student Identity**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  bold_labels() %>% 
+    as_gt() 
+ 
+  SecondGenImm_Identity<-DEIData_master_clean %>% 
+    dplyr::select( -c('Q1_Participant Type','Q18_FGCS':'Q18_PreferNottoSay','Q18_IS')) #remove other other identity groups from analysis
+
+  SecondGenImm_Identity%>%
+  tbl_summary(by = `Q18_SGI`, digits = ~ 0,
+   missing_text = "(Missing)",sort = list(everything() ~ "frequency")) %>% 
+  modify_header(label ~ "**Second Generation Immigrant Identity**") %>%  
+  modify_caption("**Table 9.Second Generation Immigrant Identity**") %>%
+  modify_footnote(everything() ~ NA) %>% #removes superscript from header
+  bold_labels() %>% 
+    as_gt() 
+```
+
+**_Final Clean Dataset_**
+```{r}
+write.table(DEIData_master_clean, paste ('Clean Dataset/UCONN_DEI_Clean_', Sys.Date(), ".txt"), sep ="\t", row.names=FALSE)
+
+```
+
